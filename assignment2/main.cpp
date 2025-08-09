@@ -28,11 +28,43 @@ Eigen::Matrix4f get_model_matrix(float rotation_angle)
     return model;
 }
 
-Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
+// 参考：
+// https://github.com/DrFlower/GAMES_101_202_Homework/blob/main/Homework_101/Assignment1/Code/main.cpp
+Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
+                                      float zNear, float zFar)
 {
-    // TODO: Copy-paste your implementation from the previous assignment.
-    Eigen::Matrix4f projection;
+    assert(zNear > 0 && zFar > 0); // 这里的zNear和zFar是距离，是正数
 
+    // 这里转化成坐标
+    zNear = -zNear;
+    zFar = -zFar;
+
+    float t = tan(eye_fov / 2 * MY_PI / 180.0f) * abs(zNear);
+    float r = t * aspect_ratio;
+    float b = -t;
+    float l = -r;
+
+    // 正交投影先归一化到一个[-1,1]^3的立方体
+    Eigen::Matrix4f M_ortho_scale;
+    M_ortho_scale << 2 / (r - l), 0, 0, 0,
+        0, 2 / (t - b), 0, 0,
+        0, 0, 2 / (zFar - zNear), 0,
+        0, 0, 0, 1;
+
+    // 再平移到原点
+    Eigen::Matrix4f M_ortho_translate;
+    M_ortho_translate << 1, 0, 0, -(r + l) / 2,
+        0, 1, 0, -(t + b) / 2,
+        0, 0, 1, -(zNear + zFar) / 2,
+        0, 0, 0, 1;
+
+    // 透视转正交投影矩阵
+    Eigen::Matrix4f M_persp2ortho;
+    M_persp2ortho << zNear, 0, 0, 0,
+        0, zNear, 0, 0,
+        0, 0, zNear + zFar, -zNear * zFar,
+        0, 0, 1, 0;
+    Eigen::Matrix4f projection = M_ortho_scale * M_ortho_translate * M_persp2ortho;
     return projection;
 }
 
