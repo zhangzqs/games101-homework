@@ -117,7 +117,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload &payload)
     Eigen::Vector3f return_color = {0, 0, 0};
     if (payload.texture)
     {
-        // TODO: Get the texture value at the texture coordinates of the current fragment
+        return_color = payload.texture->getColor(payload.tex_coords.x(), payload.tex_coords.y());
     }
     Eigen::Vector3f texture_color;
     texture_color << return_color.x(), return_color.y(), return_color.z();
@@ -143,8 +143,31 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload &payload)
 
     for (auto &light : lights)
     {
-        // TODO: For each light source in the code, calculate what the *ambient*, *diffuse*, and *specular*
-        // components are. Then, accumulate that result on the *result_color* object.
+        // 计算着色点的光源方向l
+        Eigen::Vector3f l = (light.position - point).normalized();
+        // 计算着色点的视线方向v
+        Eigen::Vector3f v = (eye_pos - point).normalized();
+        // 计算光源方向l和v的半程向量h
+        Eigen::Vector3f h = (l + v).normalized();
+
+        // 环境光计算
+        Eigen::Vector3f ambient = ka.cwiseProduct(amb_light_intensity);
+
+        // 计算光源到着色点的距离的平方
+        float r2 = (light.position - point).squaredNorm();
+
+        // 计算到着色点的光照强度
+        Eigen::Vector3f light_intensity = light.intensity / r2;
+
+        // 计算漫反射光强
+        Eigen::Vector3f diffuse = kd.cwiseProduct(light_intensity);
+        diffuse *= std::max(0.f, normal.dot(l));
+
+        // 计算高光光强
+        Eigen::Vector3f specular = ks.cwiseProduct(light.intensity);
+        specular *= std::pow(std::max(0.f, normal.dot(h)), p);
+
+        result_color += ambient + diffuse + specular;
     }
 
     return result_color * 255.f;
