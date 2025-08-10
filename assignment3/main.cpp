@@ -164,7 +164,7 @@ Eigen::Vector3f texture_fragment_shader(const fragment_shader_payload &payload)
         diffuse *= std::max(0.f, normal.dot(l));
 
         // 计算高光光强
-        Eigen::Vector3f specular = ks.cwiseProduct(light.intensity);
+        Eigen::Vector3f specular = ks.cwiseProduct(light_intensity);
         specular *= std::pow(std::max(0.f, normal.dot(h)), p);
 
         result_color += ambient + diffuse + specular;
@@ -216,7 +216,7 @@ Eigen::Vector3f phong_fragment_shader(const fragment_shader_payload &payload)
         diffuse *= std::max(0.f, normal.dot(l));
 
         // 计算高光光强
-        Eigen::Vector3f specular = ks.cwiseProduct(light.intensity);
+        Eigen::Vector3f specular = ks.cwiseProduct(light_intensity);
         specular *= std::pow(std::max(0.f, normal.dot(h)), p);
 
         result_color += ambient + diffuse + specular;
