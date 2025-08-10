@@ -257,26 +257,64 @@ static Eigen::Vector2f interpolate(float alpha, float beta, float gamma, const E
 // Screen space rasterization
 void rst::rasterizer::rasterize_triangle(const Triangle &t, const std::array<Eigen::Vector3f, 3> &view_pos)
 {
-    // TODO: From your HW3, get the triangle rasterization code.
-    // TODO: Inside your rasterization loop:
-    //    * v[i].w() is the vertex view space depth value z.
-    //    * Z is interpolated view space depth for the current pixel
-    //    * zp is depth between zNear and zFar, used for z-buffer
+    auto v = t.toVector4(); // 三角形的三个顶点的齐次坐标表示
+    // 寻找三角形的包围盒
+    float min_x = std::min({v[0].x(), v[1].x(), v[2].x()});
+    float max_x = std::max({v[0].x(), v[1].x(), v[2].x()});
+    float min_y = std::min({v[0].y(), v[1].y(), v[2].y()});
+    float max_y = std::max({v[0].y(), v[1].y(), v[2].y()});
+    // min向下取整
+    // max向上取整
+    min_x = std::floor(min_x);
+    max_x = std::ceil(max_x);
+    min_y = std::floor(min_y);
+    max_y = std::ceil(max_y);
 
-    // float Z = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-    // float zp = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-    // zp *= Z;
+    // 遍历包围盒中的每个像素
+    for (int x = min_x; x < max_x; ++x)
+    {
+        for (int y = min_y; y < max_y; ++y)
+        {
+            // 判断像素中心点是否在三角形内
+            if (insideTriangle(x, y, t.v))
+            {
+                // 计算三角形重心坐标
+                auto [alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+                // 插值计算z值
+                float Z = 1.0 / (alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                float zp = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                zp *= Z;
 
-    // TODO: Interpolate the attributes:
-    // auto interpolated_color
-    // auto interpolated_normal
-    // auto interpolated_texcoords
-    // auto interpolated_shadingcoords
+                // 如果z值小于当前深度缓冲区中的值，则更新深度缓冲区和颜色缓冲区
+                int buf_index = get_index(x, y);
+                if (zp < depth_buf[buf_index])
+                {
+                    depth_buf[buf_index] = zp;
 
-    // Use: fragment_shader_payload payload( interpolated_color, interpolated_normal.normalized(), interpolated_texcoords, texture ? &*texture : nullptr);
-    // Use: payload.view_pos = interpolated_shadingcoords;
-    // Use: Instead of passing the triangle's color directly to the frame buffer, pass the color to the shaders first to get the final color;
-    // Use: auto pixel_color = fragment_shader(payload);
+                    // 插值计算法向量
+                    Eigen::Vector3f interpolated_normal = alpha * t.normal[0] + beta * t.normal[1] + gamma * t.normal[2];
+                    interpolated_normal.normalize();
+
+                    // 插值计算顶点颜色
+                    Eigen::Vector3f interpolated_color = alpha * t.color[0] + beta * t.color[1] + gamma * t.color[2];
+
+                    // 插值计算纹理坐标
+                    Eigen::Vector2f interpolated_texcoords = alpha * t.tex_coords[0] + beta * t.tex_coords[1] + gamma * t.tex_coords[2];
+
+                    // 插值计算着色坐标
+                    Eigen::Vector3f interpolated_shadingcoords = alpha * view_pos[0] + beta * view_pos[1] + gamma * view_pos[2];
+
+                    // 构造片元着色器
+                    fragment_shader_payload payload(interpolated_color, interpolated_normal, interpolated_texcoords, texture.has_value() ? &*texture : nullptr);
+                    payload.view_pos = interpolated_shadingcoords;
+
+                    // 调用片元着色器计算颜色
+                    auto pixel_color = fragment_shader(payload);
+                    set_pixel(Eigen::Vector2i(x, y), pixel_color);
+                }
+            }
+        }
+    }
 }
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f &m)
